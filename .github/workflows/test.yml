@@ -1,0 +1,40 @@
+name: Run GUT Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install Godot
+      uses: chickensoft-games/setup-godot@v2
+      with:
+        version: 4.4.1
+        include-templates: true
+        cache: true
+
+    - name: Download GUT addon
+      run: |
+        mkdir -p addons
+        git clone -q --branch godot_4_4 https://github.com/bitwes/Gut.git g
+        cd g
+        git checkout -q e2f8c4b6220144c6665976e58d8c15ad715de244
+        mv addons/gut ../addons/
+        cd ..
+        rm -rf g
+
+    - name: Import assets (required for GUT)
+      run: |
+        godot --headless --import --path "$PWD"
+
+    - name: Run GUT Tests
+      run: |
+        godot --headless -s addons/gut/gut_cmdln.gd -d --path "$PWD" -gtest=res://test/test_RhythmGameManager.gd -glog=1 -gexit

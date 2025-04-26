@@ -124,7 +124,6 @@ class TestPlaybackControls:
 		await get_tree().create_timer(0.1).timeout
 		assert_gt(manager.get_current_time(), 0.0, "Pre-condition: Time should be > 0 before restart.")
 		manager.restart()
-		await get_tree().process_frame
 		assert_almost_eq(manager.get_current_time(), 0.0, 0.03, "Current time should be 0.0 after restart.")
 		assert_true(manager.is_playing(), "Manager should be playing after restart (due to seek resuming).")
 		assert_signal_not_emitted(manager, "error_occurred", "No error should occur on valid restart.")

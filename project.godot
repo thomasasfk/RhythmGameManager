@@ -1,0 +1,40 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="ChangeMe"
+run/main_scene="uid://wndg3jna2xid"
+config/features=PackedStringArray("4.4", "Forward Plus")
+config/icon="res://icon.svg"
+
+[autoload]
+
+RhythmGameManager="*res://scripts/autoload/RhythmGameManager.gd"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/resizable=false
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep_height"
+
+[dotnet]
+
+project/assembly_name="GodotRushStardom"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/gut/plugin.cfg")
+
+[rendering]
+
+textures/canvas_textures/default_texture_filter=0

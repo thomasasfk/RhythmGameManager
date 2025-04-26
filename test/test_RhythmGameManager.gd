@@ -61,9 +61,6 @@ class TestPlaybackControls:
 			manager._current_timing_segment_index = -1
 		watch_signals(manager)
 
-	func after_each():
-		pass
-
 	func test_play_without_loading() -> void:
 		manager.play()
 		await get_tree().process_frame
@@ -114,7 +111,6 @@ class TestPlaybackControls:
 		var pause_time = manager.get_current_time()
 		assert_gt(pause_time, 0.0, "Pre-condition: Should be paused at non-zero time.")
 		manager.play()
-		await get_tree().process_frame
 		assert_almost_eq(manager.get_current_time(), pause_time, 0.05, "Current time should be near pause time on resume.")
 		assert_true(manager.is_playing(), "Manager should be playing after resuming.")
 		await get_tree().create_timer(0.1).timeout
@@ -155,9 +151,6 @@ class TestSeeking:
 			# Some tests check seeking *without* loading, they will handle it
 			pass # Loading handled in tests needing it
 		watch_signals(manager)
-
-	func after_each():
-		pass
 
 	func test_seek_without_loading() -> void:
 		manager.seek(5.0)
@@ -231,9 +224,6 @@ class TestTimingMapManagement:
 		manager._current_timing_segment_index = -1
 		watch_signals(manager)
 
-	func after_each():
-		pass
-
 	func create_valid_timing_map() -> Array:
 		return [
 			{"time": 0.0, "bpm": 120.0, "time_signature": [4, 4]},
@@ -297,9 +287,6 @@ class TestTimingInfoRetrieval:
 		assert_true(manager.set_timing_map(map), "Failed to set timing map in before_each.")
 		await get_tree().process_frame
 		watch_signals(manager)
-
-	func after_each():
-		pass
 
 	func create_valid_timing_map() -> Array:
 		return [

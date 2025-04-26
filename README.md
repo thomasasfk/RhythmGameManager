@@ -1,4 +1,5 @@
 # Godot Rhythm Game Manager
+[![Run GUT Tests](https://github.com/thomasasfk/RhythmGameManager/actions/workflows/test.yml/badge.svg)](https://github.com/thomasasfk/RhythmGameManager/actions/workflows/test.yml)
 
 A simple autoload singleton (`RhythmGameManager.gd`) for Godot 4.x that manages audio playback, song timing (BPM/time signatures), and playback state.
 

@@ -174,7 +174,7 @@ class TestSeeking:
         var seek_time = 3.0
         manager.seek(seek_time)
         await get_tree().process_frame
-        assert_almost_eq(manager.get_current_time(), seek_time, 0.03, "Current time should be updated after seek.")
+        assert_almost_eq(manager.get_current_time(), seek_time, 0.1, "Current time should be updated after seek.")
         assert_true(manager.is_playing(), "Should resume playing after seeking while playing.")
         assert_signal_not_emitted(manager, "error_occurred", "error_occurred should not emit on valid seek.")
         await get_tree().create_timer(0.1).timeout

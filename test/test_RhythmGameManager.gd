@@ -190,25 +190,27 @@ class TestSeeking:
         assert_false(manager.is_playing(), "Should not be playing after seeking to end.")
         assert_signal_not_emitted(manager, "error_occurred", "error_occurred should not emit on valid seek to end.")
 
-    func test_seek_beyond_end_clamps_and_errors() -> void:
+    func test_seek_clamps_to_song_bounds() -> void:
         assert_true(manager.load_song(TEST_SONG_PATH), "Pre-condition: Failed to load test song.")
         await get_tree().process_frame
-        var seek_time = manager.song_length + 10.0
-        manager.seek(seek_time)
-        await get_tree().process_frame
-        assert_almost_eq(manager.get_current_time(), manager.song_length, 0.01, "Current time should be clamped to song length.")
-        assert_false(manager.is_playing(), "Should not be playing after seeking beyond end.")
-
-    func test_seek_negative_clamps_and_errors() -> void:
-        assert_true(manager.load_song(TEST_SONG_PATH), "Pre-condition: Failed to load test song.")
-        await get_tree().process_frame
-        manager.seek(-5.0)
+        manager.seek(-1.0) # Seek before start
         await get_tree().process_frame
         assert_almost_eq(manager.get_current_time(), 0.0, 0.01, "Current time should be clamped to 0.0.")
-        assert_false(manager.is_playing(), "Should not be playing after seeking negative.")
+        assert_signal_emitted(manager, "error_occurred", "error_occurred should emit on seek clamping.")
+
+        manager.seek(manager.song_length + 1.0) # Seek after end
+        await get_tree().process_frame
+        assert_almost_eq(manager.get_current_time(), manager.song_length, 0.01, "Current time should be clamped to song length.")
+        assert_signal_emitted(manager, "error_occurred", "error_occurred should emit on seek clamping.")
 
 
-class TestTimingMapManagement:
+class TestNoteHandling:
+    extends GutTest
+    # This class will be removed and its tests distributed
+
+
+# New classes for better organization
+class TestNoteMapManagement:
     extends GutTest
 
     var manager: Node
@@ -216,130 +218,335 @@ class TestTimingMapManagement:
 
     func before_each():
         manager = get_node_or_null("/root/RhythmGameManager")
-        assert_ne(manager, null, "RhythmGameManager singleton should be loaded.")
-        assert_true(manager.load_song(TEST_SONG_PATH), "Failed to load test song in before_each.")
-        await get_tree().process_frame # Ensure load completes
-        manager._timing_map = []
-        manager._current_timing_segment_index = -1
+        assert_ne(manager, null)
+        assert_true(manager.load_song(TEST_SONG_PATH))
+        manager._note_map = []
+        manager._hit_note_ids = {}
+        await get_tree().process_frame
         watch_signals(manager)
 
-    func create_valid_timing_map() -> Array:
+    func create_valid_note_map() -> Array:
         return [
-            {"time": 0.0, "bpm": 120.0, "time_signature": [4, 4]},
-            {"time": 2.0, "bpm": 180.0, "time_signature": [3, 4]},
-            {"time": 4.0, "bpm": 90.0, "time_signature": [4, 4]}
+            {"id": "note_1", "time": 1.0},
+            {"id": "note_2", "time": 2.0, "lane": 1},
+            {"id": "note_3", "time": 3.0},
         ]
 
-    func test_set_timing_map_success() -> void:
-        var map = create_valid_timing_map()
-        var success = manager.set_timing_map(map)
+    func test_set_note_map_success():
+        var map = create_valid_note_map()
+        var success = manager.set_note_map(map)
         await get_tree().process_frame
-        assert_true(success, "set_timing_map should return true for valid map.")
-        assert_eq_deep(manager.get_timing_map(), map)
-        assert_signal_not_emitted(manager, "error_occurred", "error_occurred should not emit on valid set_timing_map.")
-        assert_signal_emitted(manager, "timing_map_set", "timing_map_set should be emitted on success.") # Need to check signal args maybe
+        assert_true(success)
+        assert_eq_deep(manager.get_note_map(), map)
+        assert_eq(manager._hit_note_ids.size(), 0)
+        assert_signal_emitted(manager, "note_map_set")
+        assert_signal_not_emitted(manager, "error_occurred")
 
-    func test_set_timing_map_failure_not_array() -> void:
-        var success = manager.set_timing_map("not an array")
+    func test_set_note_map_failure_not_array():
+        var success = manager.set_note_map("not an array")
         await get_tree().process_frame
-        assert_false(success, "set_timing_map should return false for non-array input.")
-        assert_eq(manager.get_timing_map(), [], "Timing map should remain empty after failed set.")
-        assert_signal_not_emitted(manager, "timing_map_set", "timing_map_set should not emit on failure.")
-        assert_signal_emitted(manager, "error_occurred", "error_occurred should be emitted.")
+        assert_false(success)
+        assert_eq(manager.get_note_map(), [])
+        assert_signal_emitted(manager, "error_occurred")
+        assert_signal_not_emitted(manager, "note_map_set")
 
-    func test_set_timing_map_failure_invalid_structure() -> void:
-        var map = [
-            {"time": 0.0, "bpm": 120.0}, # Missing time_signature
-            {"time": 2.0, "bpm": 180.0, "time_signature": [3, 4]}
-        ]
-        var success = manager.set_timing_map(map)
+    func test_set_note_map_failure_invalid_structure_missing_time():
+        var map = [{"id": "a"}, {"id": "b", "time": 1.0}]
+        var success = manager.set_note_map(map)
         await get_tree().process_frame
-        assert_false(success, "set_timing_map should return false for map with missing keys.")
-        assert_eq(manager.get_timing_map(), [], "Timing map should remain empty after failed set.")
-        assert_signal_not_emitted(manager, "timing_map_set", "timing_map_set should not emit on failure.")
-        assert_signal_emitted(manager, "error_occurred", "error_occurred should be emitted.")
+        assert_false(success)
+        assert_eq(manager.get_note_map(), [])
+        assert_signal_emitted(manager, "error_occurred")
+        assert_signal_not_emitted(manager, "note_map_set")
 
-    func test_set_timing_map_failure_unsorted() -> void:
-        var map = [
-            {"time": 2.0, "bpm": 180.0, "time_signature": [3, 4]},
-            {"time": 0.0, "bpm": 120.0, "time_signature": [4, 4]}
-        ]
-        var success = manager.set_timing_map(map)
+    func test_set_note_map_failure_invalid_structure_missing_id():
+        var map = [{"time": 0.5}, {"id": "b", "time": 1.0}]
+        var success = manager.set_note_map(map)
         await get_tree().process_frame
-        assert_false(success, "set_timing_map should return false for unsorted map.")
-        assert_eq(manager.get_timing_map(), [], "Timing map should remain empty after failed set.")
-        assert_signal_not_emitted(manager, "timing_map_set", "timing_map_set should not emit on failure.")
-        assert_signal_emitted(manager, "error_occurred", "error_occurred should be emitted.")
+        assert_false(success)
+        assert_eq(manager.get_note_map(), [])
+        assert_signal_emitted(manager, "error_occurred")
+        assert_signal_not_emitted(manager, "note_map_set")
+
+    func test_set_note_map_failure_duplicate_id():
+        var map = [{"id": "a", "time": 0.5}, {"id": "a", "time": 1.0}]
+        var success = manager.set_note_map(map)
+        await get_tree().process_frame
+        assert_false(success)
+        assert_eq(manager.get_note_map(), [])
+        assert_signal_emitted(manager, "error_occurred")
+        assert_signal_not_emitted(manager, "note_map_set")
+
+    func test_set_note_map_failure_negative_time():
+        var map = [{"id": "a", "time": -0.5}]
+        var success = manager.set_note_map(map)
+        await get_tree().process_frame
+        assert_false(success)
+        assert_eq(manager.get_note_map(), [])
+        assert_signal_emitted(manager, "error_occurred")
+        assert_signal_not_emitted(manager, "note_map_set")
 
 
-class TestTimingInfoRetrieval:
+class TestWindowSetting:
+    extends GutTest
+
+    var manager: Node
+    const TEST_HIT_WINDOW_DEFAULT = 0.15
+    const TEST_MISS_WINDOW_DEFAULT = 0.15
+
+    func before_each():
+        manager = get_node_or_null("/root/RhythmGameManager")
+        assert_ne(manager, null)
+        # Reset windows to known defaults
+        manager.set_hittable_window(TEST_HIT_WINDOW_DEFAULT)
+        manager.set_miss_window(TEST_MISS_WINDOW_DEFAULT)
+        watch_signals(manager)
+
+    func test_set_hittable_window_success():
+        assert_true(manager.set_hittable_window(0.2))
+        assert_almost_eq(manager.hittable_window, 0.2, 0.001)
+        assert_signal_not_emitted(manager, "error_occurred")
+
+    func test_set_hittable_window_failure_non_positive():
+        assert_false(manager.set_hittable_window(0.0))
+        assert_almost_eq(manager.hittable_window, TEST_HIT_WINDOW_DEFAULT, 0.001)
+        assert_signal_emitted(manager, "error_occurred")
+
+    func test_set_miss_window_success_positive():
+        assert_true(manager.set_miss_window(0.25))
+        assert_almost_eq(manager.miss_window, 0.25, 0.001)
+        assert_signal_not_emitted(manager, "error_occurred")
+
+    func test_set_miss_window_success_zero_disables():
+        assert_true(manager.set_miss_window(0.0))
+        assert_almost_eq(manager.miss_window, 0.0, 0.001)
+        assert_signal_not_emitted(manager, "error_occurred")
+
+    func test_set_miss_window_success_negative_disables():
+        assert_true(manager.set_miss_window(-0.1))
+        assert_almost_eq(manager.miss_window, -0.1, 0.001)
+        assert_signal_not_emitted(manager, "error_occurred")
+
+
+class TestHitAttempt:
     extends GutTest
 
     var manager: Node
     const TEST_SONG_PATH = "res://resources/test_audio.ogg"
+    const TEST_HIT_WINDOW = 0.15
 
     func before_each():
         manager = get_node_or_null("/root/RhythmGameManager")
-        assert_ne(manager, null, "RhythmGameManager singleton should be loaded.")
-        assert_true(manager.load_song(TEST_SONG_PATH), "Failed to load test song in before_each.")
-        var map = create_valid_timing_map() # Set up the map needed for these tests
-        assert_true(manager.set_timing_map(map), "Failed to set timing map in before_each.")
+        assert_ne(manager, null)
+        assert_true(manager.load_song(TEST_SONG_PATH))
+        manager._note_map = []
+        manager._hit_note_ids = {}
+        manager.set_hittable_window(TEST_HIT_WINDOW)
         await get_tree().process_frame
         watch_signals(manager)
 
-    func create_valid_timing_map() -> Array:
+    func create_valid_note_map() -> Array:
         return [
-            {"time": 0.0, "bpm": 120.0, "time_signature": [4, 4]},
-            {"time": 2.0, "bpm": 180.0, "time_signature": [3, 4]},
-            {"time": 4.0, "bpm": 90.0, "time_signature": [4, 4]}
+            {"id": "note_1", "time": 1.0},
+            {"id": "note_2", "time": 2.0, "lane": 1},
+            {"id": "note_3", "time": 3.0},
         ]
 
-    func test_get_timing_info_at_time() -> void:
-        var map = create_valid_timing_map() # Get the map again for comparison
-        assert_eq_deep(manager.get_timing_info_at_time(-1.0), {})
-        assert_eq_deep(manager.get_timing_info_at_time(0.0), map[0])
-        assert_eq_deep(manager.get_timing_info_at_time(1.5), map[0])
-        assert_eq_deep(manager.get_timing_info_at_time(2.0), map[1])
-        assert_eq_deep(manager.get_timing_info_at_time(3.99), map[1])
-        assert_eq_deep(manager.get_timing_info_at_time(4.0), map[2])
-        assert_eq_deep(manager.get_timing_info_at_time(10.0), map[2])
+    func test_attempt_hit_success_perfect():
+        assert_true(manager.set_note_map(create_valid_note_map()))
+        var result = manager.attempt_hit(1.0)
+        assert_true(result != null)
+        assert_eq(result["note_id"], "note_1")
+        assert_almost_eq(result["time_diff"], 0.0, 0.001)
+        assert_true(manager._hit_note_ids.has("note_1"))
+        assert_eq(manager._hit_note_ids["note_1"]["status"], "Hit")
 
-    func test_get_bpm_at_time() -> void:
-        assert_almost_eq(manager.get_bpm_at_time(-1.0), 0.0, 0.01, "BPM should be 0 before first segment.")
-        assert_almost_eq(manager.get_bpm_at_time(0.0), 120.0, 0.01, "BPM at 0.0s")
-        assert_almost_eq(manager.get_bpm_at_time(1.5), 120.0, 0.01, "BPM at 1.5s")
-        assert_almost_eq(manager.get_bpm_at_time(2.0), 180.0, 0.01, "BPM at 2.0s")
-        assert_almost_eq(manager.get_bpm_at_time(3.99), 180.0, 0.01, "BPM at 3.99s")
-        assert_almost_eq(manager.get_bpm_at_time(4.0), 90.0, 0.01, "BPM at 4.0s")
-        assert_almost_eq(manager.get_bpm_at_time(10.0), 90.0, 0.01, "BPM at 10.0s")
+    func test_attempt_hit_success_early():
+        assert_true(manager.set_note_map(create_valid_note_map()))
+        var hit_time = 1.0 - TEST_HIT_WINDOW * 0.5
+        var result = manager.attempt_hit(hit_time)
+        assert_true(result != null)
+        assert_eq(result["note_id"], "note_1")
+        assert_almost_eq(result["time_diff"], hit_time - 1.0, 0.001)
+        assert_lt(result["time_diff"], 0.0)
+        assert_true(manager._hit_note_ids.has("note_1"))
 
-    func test_get_time_signature_at_time() -> void:
-        assert_eq_deep(manager.get_time_signature_at_time(-1.0), [4, 4])
-        assert_eq_deep(manager.get_time_signature_at_time(0.0), [4, 4])
-        assert_eq_deep(manager.get_time_signature_at_time(1.5), [4, 4])
-        assert_eq_deep(manager.get_time_signature_at_time(2.0), [3, 4])
-        assert_eq_deep(manager.get_time_signature_at_time(3.99), [3, 4])
-        assert_eq_deep(manager.get_time_signature_at_time(4.0), [4, 4])
-        assert_eq_deep(manager.get_time_signature_at_time(10.0), [4, 4])
+    func test_attempt_hit_success_late():
+        assert_true(manager.set_note_map(create_valid_note_map()))
+        var hit_time = 1.0 + TEST_HIT_WINDOW * 0.5
+        var result = manager.attempt_hit(hit_time)
+        assert_true(result != null)
+        assert_eq(result["note_id"], "note_1")
+        assert_almost_eq(result["time_diff"], hit_time - 1.0, 0.001)
+        assert_gt(result["time_diff"], 0.0)
+        assert_true(manager._hit_note_ids.has("note_1"))
 
-    func test_get_current_bpm_and_time_sig() -> void:
-        assert_almost_eq(manager.get_current_bpm(), 120.0, 0.01, "Current BPM at 0.0s")
-        assert_eq_deep(manager.get_current_time_signature(), [4, 4])
+    func test_attempt_hit_miss_too_early():
+        assert_true(manager.set_note_map(create_valid_note_map()))
+        var hit_time = 1.0 - TEST_HIT_WINDOW - 0.01
+        var result = manager.attempt_hit(hit_time)
+        assert_true(result == null)
+        assert_false(manager._hit_note_ids.has("note_1"))
 
-        manager.seek(2.5)
+    func test_attempt_hit_miss_too_late():
+        assert_true(manager.set_note_map(create_valid_note_map()))
+        var hit_time = 1.0 + TEST_HIT_WINDOW + 0.01
+        var result = manager.attempt_hit(hit_time)
+        assert_true(result == null)
+        assert_false(manager._hit_note_ids.has("note_1"))
+
+    func test_attempt_hit_no_notes_nearby():
+        assert_true(manager.set_note_map(create_valid_note_map()))
+        var result = manager.attempt_hit(5.0)
+        assert_true(result == null)
+
+    func test_attempt_hit_already_hit():
+        assert_true(manager.set_note_map(create_valid_note_map()))
+        var result1 = manager.attempt_hit(1.0)
+        assert_true(result1 != null)
+        var result2 = manager.attempt_hit(1.01)
+        assert_true(result2 == null)
+        assert_eq(manager._hit_note_ids.size(), 1)
+
+    func test_attempt_hit_chooses_closest():
+        var map = [{"id": "a", "time": 1.0}, {"id": "b", "time": 1.1}]
+        assert_true(manager.set_note_map(map))
+        var result = manager.attempt_hit(1.06)
+        assert_true(result != null)
+        assert_eq(result["note_id"], "b")
+
+
+class TestMissDetection:
+    extends GutTest
+
+    var manager: Node
+    const TEST_SONG_PATH = "res://resources/test_audio.ogg"
+    const TEST_MISS_WINDOW = 0.15
+
+    func before_each():
+        manager = get_node_or_null("/root/RhythmGameManager")
+        assert_ne(manager, null)
+        assert_true(manager.load_song(TEST_SONG_PATH))
+        manager._note_map = []
+        manager._hit_note_ids = {}
+        manager.set_miss_window(TEST_MISS_WINDOW)
         await get_tree().process_frame
-        assert_almost_eq(manager.get_current_bpm(), 180.0, 0.01, "Current BPM at 2.5s")
-        assert_eq_deep(manager.get_current_time_signature(), [3, 4])
+        watch_signals(manager)
 
-        manager.seek(4.1)
-        await get_tree().process_frame
-        assert_almost_eq(manager.get_current_bpm(), 90.0, 0.01, "Current BPM at 4.1s")
-        assert_eq_deep(manager.get_current_time_signature(), [4, 4])
+    func create_valid_note_map() -> Array:
+        return [
+            {"id": "note_1", "time": 1.0},
+            {"id": "note_2", "time": 2.0, "lane": 1},
+            {"id": "note_3", "time": 3.0},
+        ]
 
-        manager.seek(1.8)
-        await get_tree().process_frame
+    func test_automatic_miss_detection():
+        assert_true(manager.set_note_map(create_valid_note_map()))
         manager.play()
-        await get_tree().create_timer(0.5).timeout # Should push time past 2.0s
-        assert_true(manager.get_current_time() > 2.0, "Time should be past 2.0s")
-        assert_almost_eq(manager.get_current_bpm(), 180.0, 0.01, "Current BPM should update after crossing segment boundary during play")
-        assert_eq_deep(manager.get_current_time_signature(), [3, 4])
+        await get_tree().create_timer(1.0 + TEST_MISS_WINDOW + 0.05).timeout
+        manager.pause()
+        await get_tree().process_frame
+        assert_true(manager._hit_note_ids.has("note_1"))
+        assert_eq(manager._hit_note_ids["note_1"], "Missed")
+        assert_signal_emitted(manager, "note_missed", ["note_1", 1.0])
+        assert_false(manager._hit_note_ids.has("note_2"))
+
+    func test_miss_detection_disabled():
+        assert_true(manager.set_note_map(create_valid_note_map()))
+        assert_true(manager.set_miss_window(0.0))
+        manager.play()
+        await get_tree().create_timer(1.5).timeout
+        manager.pause()
+        await get_tree().process_frame
+        assert_false(manager._hit_note_ids.has("note_1"))
+        assert_signal_not_emitted(manager, "note_missed")
+
+
+class TestNoteQuerying:
+    extends GutTest
+
+    var manager: Node
+    const TEST_SONG_PATH = "res://resources/test_audio.ogg"
+
+    func before_each():
+        manager = get_node_or_null("/root/RhythmGameManager")
+        assert_ne(manager, null)
+        assert_true(manager.load_song(TEST_SONG_PATH))
+        manager._note_map = []
+        manager._hit_note_ids = {}
+        await get_tree().process_frame
+        watch_signals(manager)
+
+    func create_valid_note_map() -> Array:
+        return [
+            {"id": "note_1", "time": 1.0},
+            {"id": "note_2", "time": 2.0, "lane": 1},
+            {"id": "note_3", "time": 3.0},
+        ]
+
+    func test_get_notes_in_range_basic():
+        assert_true(manager.set_note_map(create_valid_note_map()))
+        var notes = manager.get_notes_in_range(0.5, 2.5)
+        assert_eq(notes.size(), 2)
+        assert_eq(notes[0]["id"], "note_1")
+        assert_eq(notes[0]["status"], "Pending")
+        assert_eq(notes[1]["id"], "note_2")
+        assert_eq(notes[1]["status"], "Pending")
+
+    func test_get_notes_in_range_includes_status():
+        assert_true(manager.set_note_map(create_valid_note_map()))
+        manager.attempt_hit(1.0)
+        manager._hit_note_ids["note_2"] = "Missed"
+
+        var notes = manager.get_notes_in_range(0.0, 4.0)
+        assert_eq(notes.size(), 3)
+        assert_eq(notes[0]["id"], "note_1")
+        assert_eq(notes[0]["status"]["status"], "Hit")
+        assert_eq(notes[1]["id"], "note_2")
+        assert_eq(notes[1]["status"], "Missed")
+        assert_eq(notes[2]["id"], "note_3")
+        assert_eq(notes[2]["status"], "Pending")
+
+
+class TestSeekReset:
+    extends GutTest
+
+    var manager: Node
+    const TEST_SONG_PATH = "res://resources/test_audio.ogg"
+
+    func before_each():
+        manager = get_node_or_null("/root/RhythmGameManager")
+        assert_ne(manager, null)
+        assert_true(manager.load_song(TEST_SONG_PATH))
+        manager._note_map = []
+        manager._hit_note_ids = {}
+        await get_tree().process_frame
+        watch_signals(manager)
+
+    func create_valid_note_map() -> Array:
+        return [
+            {"id": "note_1", "time": 1.0},
+            {"id": "note_2", "time": 2.0, "lane": 1},
+            {"id": "note_3", "time": 3.0},
+        ]
+
+    func test_seek_resets_future_hit_status():
+        assert_true(manager.set_note_map(create_valid_note_map()))
+        manager.attempt_hit(1.0)
+        assert_true(manager._hit_note_ids.has("note_1"))
+        manager._hit_note_ids["note_2"] = "Missed"
+        assert_true(manager._hit_note_ids.has("note_2"))
+        manager.seek(0.5)
+        await get_tree().process_frame
+        assert_false(manager._hit_note_ids.has("note_1"))
+        assert_false(manager._hit_note_ids.has("note_2"))
+
+    func test_seek_does_not_reset_past_hit_status():
+        assert_true(manager.set_note_map(create_valid_note_map()))
+        manager.attempt_hit(1.0)
+        assert_true(manager._hit_note_ids.has("note_1"))
+        manager.seek(1.5)
+        await get_tree().process_frame
+        assert_true(manager._hit_note_ids.has("note_1"))
+        assert_eq(manager._hit_note_ids["note_1"]["status"], "Hit")
+        assert_false(manager._hit_note_ids.has("note_2"))

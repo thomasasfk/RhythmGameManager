@@ -1,0 +1,149 @@
+[gd_scene load_steps=2 format=3 uid="uid://wndg3jna2xid"]
+
+[ext_resource type="Script" uid="uid://uafp6lhlflld" path="res://scripts/scenes/BasicRhythmGame.gd" id="1_f45yv"]
+
+[node name="BasicRhythmGame" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_f45yv")
+
+[node name="MainVBox" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TopControlsHBox" type="HBoxContainer" parent="MainVBox"]
+layout_mode = 2
+alignment = 1
+
+[node name="LoadButton" type="Button" parent="MainVBox/TopControlsHBox"]
+layout_mode = 2
+text = "Load Test Song"
+
+[node name="PlayButton" type="Button" parent="MainVBox/TopControlsHBox"]
+layout_mode = 2
+disabled = true
+text = "Play"
+
+[node name="PauseButton" type="Button" parent="MainVBox/TopControlsHBox"]
+layout_mode = 2
+disabled = true
+text = "Pause"
+
+[node name="RestartButton" type="Button" parent="MainVBox/TopControlsHBox"]
+layout_mode = 2
+disabled = true
+text = "Restart"
+
+[node name="StatusLabel" type="Label" parent="MainVBox"]
+layout_mode = 2
+text = "Status: Load a song"
+horizontal_alignment = 1
+
+[node name="TimingInfoHBox" type="HBoxContainer" parent="MainVBox"]
+layout_mode = 2
+alignment = 1
+
+[node name="TimeLabel" type="Label" parent="MainVBox/TimingInfoHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Time: 0.00 / 0.00"
+
+[node name="BPMLabel" type="Label" parent="MainVBox/TimingInfoHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "BPM: -"
+horizontal_alignment = 1
+
+[node name="TimeSigLabel" type="Label" parent="MainVBox/TimingInfoHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Time Sig: -/-"
+horizontal_alignment = 2
+
+[node name="SeekSlider" type="HSlider" parent="MainVBox"]
+layout_mode = 2
+min_value = -1.0
+max_value = 0.0
+step = 0.01
+value = -1.0
+editable = false
+
+[node name="SeekControlsHBox" type="HBoxContainer" parent="MainVBox"]
+layout_mode = 2
+
+[node name="SeekLineEdit" type="LineEdit" parent="MainVBox/SeekControlsHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "0.0"
+placeholder_text = "Seek time (s)"
+editable = false
+
+[node name="SeekButton" type="Button" parent="MainVBox/SeekControlsHBox"]
+layout_mode = 2
+disabled = true
+text = "Seek"
+
+[node name="SegmentSeekHBox" type="HBoxContainer" parent="MainVBox"]
+layout_mode = 2
+alignment = 1
+
+[node name="Seek0sButton" type="Button" parent="MainVBox/SegmentSeekHBox"]
+layout_mode = 2
+disabled = true
+text = "Seek 2.3s (100 4/4)"
+
+[node name="Seek5sButton" type="Button" parent="MainVBox/SegmentSeekHBox"]
+layout_mode = 2
+disabled = true
+text = "Seek 7.6s (150 3/4)"
+
+[node name="Seek10sButton" type="Button" parent="MainVBox/SegmentSeekHBox"]
+layout_mode = 2
+disabled = true
+text = "Seek 13.05s (80 5/4)"
+
+[node name="Seek15sButton" type="Button" parent="MainVBox/SegmentSeekHBox"]
+layout_mode = 2
+disabled = true
+text = "Seek 17.3s (120 4/4)"
+
+[node name="NoteTrackArea" type="Panel" parent="MainVBox"]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+size_flags_vertical = 2
+
+[node name="NoteContainer" type="Node" parent="MainVBox/NoteTrackArea"]
+
+[node name="HitZone" type="ColorRect" parent="MainVBox/NoteTrackArea"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -2.0
+offset_top = -30.0
+offset_right = 2.0
+offset_bottom = 30.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(1, 1, 1, 0.501961)
+
+[node name="TimingFeedbackLabel" type="Label" parent="MainVBox"]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+text = "Press SPACE to hit notes!"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="FeedbackClearTimer" type="Timer" parent="."]
+wait_time = 0.5
+one_shot = true

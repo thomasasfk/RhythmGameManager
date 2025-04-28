@@ -36,3 +36,19 @@ godot -s addons/gut/gut_cmdln.gd -d --path "$PWD" -gtest=res://test/test_RhythmG
 ```
 
 *(Ensure `godot 4.4.*` is in your system's PATH or use the full path to the executable).* 
+
+## Example Rhythm Game
+
+This project includes a functional rhythm game example that demonstrates the RhythmGameManager in action. The example provides a complete implementation with UI controls for playing, pausing, seeking, and visualizing notes.
+
+![Rhythm Game Example](example.png)
+
+The example demonstrates:
+- Audio playback controls (play, pause, restart)
+- Seeking to specific timestamps
+- BPM and time signature tracking
+- Note visualization based on timing
+- Timing feedback for note hits
+
+You can find the example in the `scenes/BasicRhythmGame.tscn` file, with the implementation in `scripts/scenes/BasicRhythmGame.gd`.
+

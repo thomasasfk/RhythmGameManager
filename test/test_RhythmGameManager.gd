@@ -204,12 +204,6 @@ class TestSeeking:
         assert_signal_emitted(manager, "error_occurred", "error_occurred should emit on seek clamping.")
 
 
-class TestNoteHandling:
-    extends GutTest
-    # This class will be removed and its tests distributed
-
-
-# New classes for better organization
 class TestNoteMapManagement:
     extends GutTest
 
